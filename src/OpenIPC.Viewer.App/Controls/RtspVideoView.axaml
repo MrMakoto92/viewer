@@ -3,7 +3,7 @@
              x:Class="OpenIPC.Viewer.App.Controls.RtspVideoView">
   <Grid Background="{StaticResource Bg0Brush}">
     <Image Name="PART_Image"
-           Stretch="Uniform"
+           Stretch="Fill"
            StretchDirection="Both" />
   </Grid>
 </UserControl>
