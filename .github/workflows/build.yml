@@ -1,5 +1,5 @@
 name: build
-
+ 
 on:
   push:
     branches: [main]
@@ -19,7 +19,7 @@ on:
       - 'LICENSE'
       - '.gitignore'
   workflow_dispatch:
-
+ 
 jobs:
   build:
     strategy:
@@ -39,123 +39,106 @@ jobs:
     name: build (${{ matrix.rid }})
     steps:
       - uses: actions/checkout@v4
-
+ 
       - name: Set up .NET 9
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '9.0.x'
-
-      # Node for the React web SPA (Phase 21). The dotnet build/publish steps run
-      # an MSBuild target that invokes `npm ci` + `npm run build` and embeds the
-      # result into OpenIPC.Viewer.Web.dll, so Node must be present; cache keyed on
-      # the client lockfile keeps `npm ci` fast across runs.
+ 
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
           cache-dependency-path: src/OpenIPC.Viewer.Web.Client/package-lock.json
-
-      # libsecret for the keyring; the bundled FFmpeg 7 .so come from the fetch
-      # step below, not apt — the distro ffmpeg (6.1 on 24.04 runners) is the
-      # wrong ABI for FFmpeg.AutoGen 7.1.1 and must NOT end up in the archive.
+ 
       - name: Install libsecret (Linux)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y libsecret-1-0 libsecret-tools
-
+ 
       - name: Fetch bundled ffmpeg (Linux)
         if: runner.os == 'Linux'
         run: bash ./tools/fetch-ffmpeg-linux.sh
-
+ 
       - name: Install ffmpeg (macOS)
         if: runner.os == 'macOS'
         run: brew install ffmpeg
-
+ 
       - name: Fetch bundled ffmpeg (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: ./tools/fetch-ffmpeg.ps1
-
-      # Mobile heads (Android/iOS) need workloads not installed on these
-      # runners and build in their own jobs — so the desktop matrix uses a
-      # solution that excludes them. The shared App project still multi-targets
-      # the mobile TFMs, so IncludeMobileTargets=false strips them to net9.0 for
-      # these builds (a solution build / restore evaluates every TFM otherwise).
+ 
       - name: Restore
         run: dotnet restore OpenIPC.Viewer.Desktop.slnx -p:IncludeMobileTargets=false
-
+ 
       - name: Build
         run: dotnet build OpenIPC.Viewer.Desktop.slnx --configuration Release --no-restore /warnaserror -p:IncludeMobileTargets=false
-
+ 
       - name: Test
         run: dotnet test OpenIPC.Viewer.Desktop.slnx --configuration Release --no-build --verbosity normal -p:IncludeMobileTargets=false
-
+ 
       - name: Publish
         run: dotnet publish src/OpenIPC.Viewer.Desktop/OpenIPC.Viewer.Desktop.csproj -c Release -r ${{ matrix.rid }} --self-contained true /p:PublishSingleFile=true /p:IncludeNativeLibrariesForSelfExtract=true -p:IncludeMobileTargets=false -o publish/${{ matrix.rid }}
-
+ 
       - name: Package (zip)
         if: matrix.archive == 'zip'
         shell: pwsh
         run: |
           Compress-Archive -Path publish/${{ matrix.rid }}/* -DestinationPath openipc-viewer-${{ matrix.rid }}.zip
-
+ 
       - name: Package (tar.gz)
         if: matrix.archive == 'tar.gz'
         run: |
           cd publish/${{ matrix.rid }}
           tar -czf ../../openipc-viewer-${{ matrix.rid }}.tar.gz .
-
+ 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: openipc-viewer-${{ matrix.rid }}
           path: openipc-viewer-${{ matrix.rid }}.*
           if-no-files-found: error
-
+ 
   android:
     runs-on: ubuntu-latest
     name: build (android)
     env:
       FFMPEG_VERSION: n7.1
       NDK_VERSION: r27c
-      # Secrets are mapped to env so steps can gate on them (`if:` can't read
-      # secrets directly). Empty when the repo has no release keystore yet —
-      # the APK then falls back to per-runner debug signing, exactly as before.
       ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
       ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
       ANDROID_STORE_PASS: ${{ secrets.ANDROID_STORE_PASS }}
       ANDROID_KEY_PASS: ${{ secrets.ANDROID_KEY_PASS }}
     steps:
       - uses: actions/checkout@v4
-
+ 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-
+ 
       - name: Set up .NET 10
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
-
+ 
       - name: Install android workload
         run: dotnet workload install android
-
-      # FFmpeg .so build is the long pole (~15 min per ABI) — cache the output
-      # dirs for both ABIs in one entry. Key on FFmpeg version + NDK version
-      # + the build script hash so any of those changing invalidates the cache.
-      - name: Cache FFmpeg android natives (arm64 + x64)
+ 
+      - name: Cache FFmpeg android natives (arm64 + x64 + arm32)
         id: ffmpeg-cache
         uses: actions/cache@v4
         with:
           path: |
             runtimes/android-arm64/native
             runtimes/android-x64/native
+            runtimes/android-arm/native
           key: ffmpeg-android-${{ env.FFMPEG_VERSION }}-ndk${{ env.NDK_VERSION }}-${{ hashFiles('tools/build-ffmpeg-android.sh') }}
-
+ 
       - name: Set up Android NDK
         if: steps.ffmpeg-cache.outputs.cache-hit != 'true'
         uses: nttld/setup-ndk@v1
@@ -163,36 +146,30 @@ jobs:
         with:
           ndk-version: ${{ env.NDK_VERSION }}
           add-to-path: false
-
+ 
       - name: Install FFmpeg build deps
         if: steps.ffmpeg-cache.outputs.cache-hit != 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y yasm nasm pkg-config
-
-      - name: Cross-compile FFmpeg for android-arm64 + android-x64
+ 
+      - name: Cross-compile FFmpeg for android-arm64 + android-x64 + android-arm
         if: steps.ffmpeg-cache.outputs.cache-hit != 'true'
         env:
           ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
         run: bash tools/build-ffmpeg-android.sh
-
+ 
       - name: Restore
         run: dotnet restore src/OpenIPC.Viewer.Android/OpenIPC.Viewer.Android.csproj
-
+ 
       - name: Build (Release, warnings as errors)
         run: dotnet build src/OpenIPC.Viewer.Android/OpenIPC.Viewer.Android.csproj -c Release --no-restore -p:TreatWarningsAsErrors=true
-
-      # versionCode must grow monotonically or Android refuses to install the
-      # new APK over the old one ("app already installed"). Derived from the
-      # tag: major*1000000 + minor*10000 + patch*100 + rev, where rev is the
-      # rc/beta number (no number → 1) and 99 for a final release — so a final
-      # always outranks its own rcs and the next patch's rc01 outranks the
-      # final. Non-tag builds keep the csproj defaults (versionCode 1).
+ 
       - name: Compute APK version from tag
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
-          VER="${GITHUB_REF_NAME#v}"            # v0.1.7-rc2 -> 0.1.7-rc2
-          BASE="${VER%%-*}"                     # 0.1.7
+          VER="${GITHUB_REF_NAME#v}"
+          BASE="${VER%%-*}"
           IFS=. read -r MAJOR MINOR PATCH <<< "$BASE"
           case "$VER" in
             *-*) REV=$(echo "${VER#*-}" | grep -o '[0-9]*$'); REV=${REV:-1} ;;
@@ -202,11 +179,7 @@ jobs:
           echo "Tag $GITHUB_REF_NAME -> versionName=$VER versionCode=$CODE"
           echo "APP_DISPLAY_VERSION=$VER" >> "$GITHUB_ENV"
           echo "APP_VERSION=$CODE" >> "$GITHUB_ENV"
-
-      # Stable release signing (when the keystore secrets are set). Without a
-      # constant key every CI run signs with a freshly generated debug key, so
-      # Android rejects each new release as a signature mismatch until the app
-      # is uninstalled. Passwords go via env: indirection, not argv.
+ 
       - name: Set up release signing
         if: env.ANDROID_KEYSTORE_B64 != ''
         run: |
@@ -218,83 +191,74 @@ jobs:
               -p:AndroidSigningStorePass=env:ANDROID_STORE_PASS \
               -p:AndroidSigningKeyPass=env:ANDROID_KEY_PASS"
           } >> "$GITHUB_ENV"
-
+ 
       - name: Publish APK (android-arm64)
         run: dotnet publish src/OpenIPC.Viewer.Android/OpenIPC.Viewer.Android.csproj -c Release -f net10.0-android -r android-arm64 -o publish/android-arm64 -p:ApplicationVersion="${APP_VERSION:-1}" -p:ApplicationDisplayVersion="${APP_DISPLAY_VERSION:-0.1.0-beta}" $SIGN_ARGS
-
+ 
       - name: Publish APK (android-x64)
         run: dotnet publish src/OpenIPC.Viewer.Android/OpenIPC.Viewer.Android.csproj -c Release -f net10.0-android -r android-x64 -o publish/android-x64 -p:ApplicationVersion="${APP_VERSION:-1}" -p:ApplicationDisplayVersion="${APP_DISPLAY_VERSION:-0.1.0-beta}" $SIGN_ARGS
-
-      # Hard gate against shipping a corrupt APK. Both v0.3.4 and v0.3.6 went out
-      # with a bad CRC-32 on lib/<abi>/libassembly-store.so (a floating-toolchain
-      # packaging regression), so Android rejected them as "package corrupt" on
-      # every device. `unzip -t` walks every entry and fails on a CRC mismatch,
-      # so a malformed APK breaks the build here instead of reaching users.
-      # Also rename the x64 APK: both ABIs publish as org.openipc.viewer-Signed.apk,
-      # and the download-artifact merge in the release job would otherwise keep
-      # only one of them. arm64 stays canonical (what phones need); x64 gets a
-      # distinct name so both survive as separate release assets.
-      - name: Verify APK integrity + disambiguate x64
+ 
+      - name: Publish APK (android-arm)
+        run: dotnet publish src/OpenIPC.Viewer.Android/OpenIPC.Viewer.Android.csproj -c Release -f net10.0-android -r android-arm -o publish/android-arm -p:ApplicationVersion="${APP_VERSION:-1}" -p:ApplicationDisplayVersion="${APP_DISPLAY_VERSION:-0.1.0-beta}" $SIGN_ARGS
+ 
+      - name: Verify APK integrity + disambiguate x64 and arm32
         run: |
-          arm=$(ls publish/android-arm64/*-Signed.apk)
+          arm64=$(ls publish/android-arm64/*-Signed.apk)
           x64=$(ls publish/android-x64/*-Signed.apk)
-          for apk in "$arm" "$x64"; do
+          arm32=$(ls publish/android-arm/*-Signed.apk)
+          for apk in "$arm64" "$x64" "$arm32"; do
             echo "Integrity check: $apk"
             unzip -t "$apk" > /dev/null
           done
           mv "$x64" publish/android-x64/org.openipc.viewer-x64-Signed.apk
-
+          mv "$arm32" publish/android-arm/org.openipc.viewer-arm32-Signed.apk
+ 
       - name: Upload artifact (arm64)
         uses: actions/upload-artifact@v4
         with:
           name: openipc-viewer-android-arm64
           path: publish/android-arm64/*-Signed.apk
           if-no-files-found: error
-
+ 
       - name: Upload artifact (x64)
         uses: actions/upload-artifact@v4
         with:
           name: openipc-viewer-android-x64
           path: publish/android-x64/*-Signed.apk
           if-no-files-found: error
-
+ 
+      - name: Upload artifact (arm32)
+        uses: actions/upload-artifact@v4
+        with:
+          name: openipc-viewer-android-arm32
+          path: publish/android-arm/*-Signed.apk
+          if-no-files-found: error
+ 
   ios:
     runs-on: macos-14
     name: build (ios)
-    # Temporarily disabled: the .NET 10 iOS workload pins to an Xcode version
-    # the GitHub macOS runners don't ship yet (workload 26.5 needs Xcode 26.5),
-    # so iOS can't build at all right now. Skip the job entirely and drop it
-    # from the release gate so tagged releases still go out. Re-enable (set
-    # `if:` back to a real condition) once a matching runner image is available.
-    # See aka.ms/xcode-requirement.
     if: false
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
-
+ 
       - name: Set up .NET 10
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
-
+ 
       - name: Install ios workload
         run: dotnet workload install ios
-
-      # iOS Release builds for the device RID (ios-arm64), so restore must be
-      # RID-specific or the assets file won't have a net10.0-ios/ios-arm64
-      # target and the --no-restore build fails with NETSDK1047.
+ 
       - name: Restore
         run: dotnet restore src/OpenIPC.Viewer.iOS/OpenIPC.Viewer.iOS.csproj -r ios-arm64
-
+ 
       - name: Build (Release, warnings as errors)
         run: dotnet build src/OpenIPC.Viewer.iOS/OpenIPC.Viewer.iOS.csproj -c Release -r ios-arm64 --no-restore -p:TreatWarningsAsErrors=true
-
-      # Unsigned IPA — TestFlight signing is post-MVP (Phase 11). The artifact
-      # is a Release-published app bundle suitable for ad-hoc install via Xcode
-      # or for someone with credentials to sign + upload later.
+ 
       - name: Publish (ios-arm64, unsigned)
         run: dotnet publish src/OpenIPC.Viewer.iOS/OpenIPC.Viewer.iOS.csproj -c Release -f net10.0-ios -r ios-arm64 -p:CodesignKey= -p:ArchiveOnBuild=true -o publish/ios-arm64 || true
-
+ 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -303,12 +267,9 @@ jobs:
             publish/ios-arm64/**/*.ipa
             publish/ios-arm64/**/*.app
           if-no-files-found: warn
-
+ 
   release:
     needs: [build, android]
-    # iOS is disabled for now (see the ios job above), so the release only
-    # depends on the desktop matrix + android. Re-add `ios` here once that job
-    # is re-enabled.
     if: always() && startsWith(github.ref, 'refs/tags/v') && needs.build.result == 'success' && needs.android.result == 'success'
     runs-on: ubuntu-latest
     permissions:
@@ -318,9 +279,10 @@ jobs:
         with:
           path: artifacts
           merge-multiple: true
-
+ 
       - uses: softprops/action-gh-release@v2
         with:
           files: artifacts/**/*
           generate_release_notes: true
           prerelease: ${{ contains(github.ref_name, '-beta') || contains(github.ref_name, '-rc') || contains(github.ref_name, '-alpha') }}
+ 
