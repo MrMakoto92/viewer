@@ -5,6 +5,7 @@ using Android.Runtime;
 using Android.Util;
 using Avalonia;
 using Avalonia.Android;
+using Avalonia.Skia;
 using Microsoft.Extensions.DependencyInjection;
 using OpenIPC.Viewer.Core.Events;
 using OpenIPC.Viewer.Core.Persistence;
@@ -12,12 +13,7 @@ using OpenIPC.Viewer.Core.Persistence;
 namespace OpenIPC.Viewer.Android;
 
 // Avalonia 12 Android entry: AvaloniaAndroidApplication<TApp> is the bridge
-// between Android's Application lifecycle and Avalonia's AppBuilder. The DI
-// container must be built HERE (not in MainActivity.OnCreate) because
-// AvaloniaAndroidApplication.OnCreate triggers App.OnFrameworkInitializationCompleted
-// during base.OnCreate — by the time MainActivity exists, Avalonia has
-// already decided whether to set MainView. App.Services must be populated
-// before base.OnCreate runs or the user sees a blank screen.
+// between Android's Application lifecycle and Avalonia's AppBuilder.
 [Application]
 public sealed class MainApplication : AvaloniaAndroidApplication<App.App>
 {
@@ -53,5 +49,11 @@ public sealed class MainApplication : AvaloniaAndroidApplication<App.App>
     }
 
     protected override AppBuilder CustomizeAppBuilder(AppBuilder builder)
-        => base.CustomizeAppBuilder(builder).WithInterFont();
+        => base.CustomizeAppBuilder(builder)
+            .WithInterFont()
+            .With(new SkiaOptions
+            {
+                // Subimos el caché de texturas/GPU a 128 MB para eliminar el lag en transmisiones
+                MaxGpuResourceSizeBytes = 128 * 1024 * 1024
+            });
 }
