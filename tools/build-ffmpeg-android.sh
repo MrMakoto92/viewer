@@ -30,7 +30,7 @@ set -euo pipefail
 
 FFMPEG_VERSION="${FFMPEG_VERSION:-n7.1}"
 ANDROID_API="${ANDROID_API:-21}"
-BUILD_ABIS="${BUILD_ABIS:-aarch64 x86_64}"
+BUILD_ABIS="${BUILD_ABIS:-aarch64 x86_64 armv7a}"
 NDK_HOME="${ANDROID_NDK_HOME:?ANDROID_NDK_HOME must be set}"
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -71,8 +71,14 @@ build_one() {
             ff_cpu=x86-64
             rid=android-x64
             ;;
+        armv7a)
+            target=armv7a-linux-androideabi
+            ff_arch=arm
+            ff_cpu=armv7-a
+            rid=android-arm
+            ;;
         *)
-            echo "Unsupported BUILD_ABI '$abi' (expected: aarch64, x86_64)" >&2
+            echo "Unsupported BUILD_ABI '$abi' (expected: aarch64, x86_64, aarmv7a)" >&2
             exit 1
             ;;
     esac
