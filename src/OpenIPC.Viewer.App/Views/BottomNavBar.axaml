@@ -10,8 +10,9 @@
           BorderThickness="0,1,0,0"
           Padding="8,4">
 
-    <UniformGrid Rows="1" Columns="6">
+    <UniformGrid Rows="1" Columns="3">
 
+      <!-- Live -->
       <RadioButton Classes="bottomnav" GroupName="MobileNav"
                    IsChecked="{Binding IsLiveSelected, Mode=OneWay}"
                    Command="{Binding NavigateCommand}"
@@ -21,6 +22,8 @@
           <TextBlock Text="{Binding [Nav.Live], Source={x:Static svc:Localizer.Instance}}" HorizontalAlignment="Center" />
         </StackPanel>
       </RadioButton>
+
+      <!-- Library -->
       <RadioButton Classes="bottomnav" GroupName="MobileNav"
                    IsChecked="{Binding IsLibrarySelected, Mode=OneWay}"
                    Command="{Binding NavigateCommand}"
@@ -30,34 +33,8 @@
           <TextBlock Text="{Binding [Nav.Library], Source={x:Static svc:Localizer.Instance}}" HorizontalAlignment="Center" />
         </StackPanel>
       </RadioButton>
-      <RadioButton Classes="bottomnav" GroupName="MobileNav"
-                   IsChecked="{Binding IsRecordingsSelected, Mode=OneWay}"
-                   Command="{Binding NavigateCommand}"
-                   CommandParameter="recordings">
-        <StackPanel Spacing="3" HorizontalAlignment="Center">
-          <PathIcon Data="{StaticResource IconRecordings}" Width="18" Height="18" HorizontalAlignment="Center" />
-          <TextBlock Text="{Binding [Nav.RecordingsShort], Source={x:Static svc:Localizer.Instance}}" HorizontalAlignment="Center" />
-        </StackPanel>
-      </RadioButton>
-      <RadioButton Classes="bottomnav" GroupName="MobileNav"
-                   IsChecked="{Binding IsEventsSelected, Mode=OneWay}"
-                   Command="{Binding NavigateCommand}"
-                   CommandParameter="events">
-        <StackPanel Spacing="3" HorizontalAlignment="Center">
-          <PathIcon Data="{StaticResource IconEvents}" Width="18" Height="18" HorizontalAlignment="Center" />
-          <TextBlock Text="{Binding [Nav.Events], Source={x:Static svc:Localizer.Instance}}" HorizontalAlignment="Center" />
-        </StackPanel>
-      </RadioButton>
-      <RadioButton Classes="bottomnav" GroupName="MobileNav"
-                   IsChecked="{Binding IsAnalyticsSelected, Mode=OneWay}"
-                   Command="{Binding NavigateCommand}"
-                   CommandParameter="analytics">
-        <StackPanel Spacing="3" HorizontalAlignment="Center">
-          <Path Classes="lucide" Data="{StaticResource IconRadar}"
-                Stroke="{StaticResource TextPrimaryBrush}" Width="18" Height="18" HorizontalAlignment="Center" />
-          <TextBlock Text="{Binding [Nav.Analytics], Source={x:Static svc:Localizer.Instance}}" HorizontalAlignment="Center" />
-        </StackPanel>
-      </RadioButton>
+
+      <!-- Settings -->
       <RadioButton Classes="bottomnav" GroupName="MobileNav"
                    IsChecked="{Binding IsSettingsSelected, Mode=OneWay}"
                    Command="{Binding NavigateCommand}"
