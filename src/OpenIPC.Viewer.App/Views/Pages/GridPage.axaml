@@ -47,31 +47,37 @@
             </DataTemplate>
           </ComboBox.ItemTemplate>
         </ComboBox>
-        <Button Content="1×1" Command="{Binding SetLayoutCommand}" CommandParameter="1"
-                Padding="10,6" CornerRadius="6"
+
+        <!-- Botón único selector de Grid con Menú Desplegable -->
+        <Button Padding="10,6" CornerRadius="6"
                 Background="{StaticResource Bg2Brush}"
                 BorderBrush="{StaticResource BorderMediumBrush}" BorderThickness="1"
-                Foreground="{StaticResource TextPrimaryBrush}" />
-        <Button Content="2×2" Command="{Binding SetLayoutCommand}" CommandParameter="2"
-                Padding="10,6" CornerRadius="6"
-                Background="{StaticResource Bg2Brush}"
-                BorderBrush="{StaticResource BorderMediumBrush}" BorderThickness="1"
-                Foreground="{StaticResource TextPrimaryBrush}" />
-        <Button Content="3×3" Command="{Binding SetLayoutCommand}" CommandParameter="3"
-                Padding="10,6" CornerRadius="6"
-                Background="{StaticResource Bg2Brush}"
-                BorderBrush="{StaticResource BorderMediumBrush}" BorderThickness="1"
-                Foreground="{StaticResource TextPrimaryBrush}" />
-        <Button Content="4×4" Command="{Binding SetLayoutCommand}" CommandParameter="4"
-                Padding="10,6" CornerRadius="6"
-                Background="{StaticResource Bg2Brush}"
-                BorderBrush="{StaticResource BorderMediumBrush}" BorderThickness="1"
-                Foreground="{StaticResource TextPrimaryBrush}" />
-        <Button Content="5×5" Command="{Binding SetLayoutCommand}" CommandParameter="5"
-                Padding="10,6" CornerRadius="6"
-                Background="{StaticResource Bg2Brush}"
-                BorderBrush="{StaticResource BorderMediumBrush}" BorderThickness="1"
-                Foreground="{StaticResource TextPrimaryBrush}" />
+                Foreground="{StaticResource TextPrimaryBrush}">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <Path Classes="lucide" Data="{StaticResource IconLayoutGrid}"
+                  Stroke="{StaticResource TextPrimaryBrush}" Width="14" Height="14" />
+            <TextBlock Text="Grid" VerticalAlignment="Center" FontSize="13" />
+          </StackPanel>
+
+          <Button.Flyout>
+            <Flyout Placement="Bottom">
+              <Border Padding="4" Background="{StaticResource Bg1Brush}" CornerRadius="6">
+                <StackPanel Orientation="Vertical" Spacing="2">
+                  <Button Content="1 × 1" Command="{Binding SetLayoutCommand}" CommandParameter="1"
+                          HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Background="Transparent" />
+                  <Button Content="2 × 2" Command="{Binding SetLayoutCommand}" CommandParameter="2"
+                          HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Background="Transparent" />
+                  <Button Content="3 × 3" Command="{Binding SetLayoutCommand}" CommandParameter="3"
+                          HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Background="Transparent" />
+                  <Button Content="4 × 4" Command="{Binding SetLayoutCommand}" CommandParameter="4"
+                          HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Background="Transparent" />
+                  <Button Content="5 × 5" Command="{Binding SetLayoutCommand}" CommandParameter="5"
+                          HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Background="Transparent" />
+                </StackPanel>
+              </Border>
+            </Flyout>
+          </Button.Flyout>
+        </Button>
 
         <!-- Fullscreen / kiosk: full-bleed grid for a guard station (Phase 20). -->
         <Button Click="OnFullscreenClick"
