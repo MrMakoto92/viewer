@@ -161,7 +161,7 @@
             </StackPanel>
 
             <TextBlock Foreground="{StaticResource TextSecondaryBrush}">
-              <Run Text="OpenIPC Viewer " />
+              <Run Text="OrionViewer+ " />
               <Run Text="{Binding Version}" />
             </TextBlock>
 
