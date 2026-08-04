@@ -201,11 +201,30 @@
                                                  SourceAspect="{Binding SourceAspect}"
                                                  IsHitTestVisible="False" />
 
-                      <!-- Top-left: name -->
-                      <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8"
-                              Background="#90000000" CornerRadius="3" Padding="6,2">
-                        <TextBlock Text="{Binding Name}" Foreground="White" FontSize="13" FontWeight="Medium" />
-                      </Border>
+                      <!-- Bottom-left: Audio Toggle + Camera Name -->
+                      <StackPanel HorizontalAlignment="Left" VerticalAlignment="Bottom" 
+                                  Orientation="Horizontal" Spacing="6" Margin="8">
+                        <!-- Listen toggle button -->
+                        <Button Command="{Binding ToggleListenCommand}"
+                                IsVisible="{Binding AudioAvailable}"
+                                Background="#80000000" CornerRadius="14"
+                                Width="28" Height="28" Padding="0"
+                                ToolTip.Tip="{Binding [CameraPage.Tooltip.Listen], Source={x:Static svc:Localizer.Instance}}">
+                          <Panel>
+                            <Path Classes="lucide" Data="{StaticResource IconVolume}"
+                                  Stroke="{StaticResource AccentBrush}" Width="16" Height="16"
+                                  IsVisible="{Binding IsListening}" />
+                            <Path Classes="lucide" Data="{StaticResource IconVolumeMuted}"
+                                  Stroke="White" Width="16" Height="16"
+                                  IsVisible="{Binding !IsListening}" />
+                          </Panel>
+                        </Button>
+
+                        <!-- Camera Name -->
+                        <Border Background="#90000000" CornerRadius="3" Padding="6,2" VerticalAlignment="Center">
+                          <TextBlock Text="{Binding Name}" Foreground="White" FontSize="13" FontWeight="Medium" />
+                        </Border>
+                      </StackPanel>
 
                       <!-- Bottom-center: object counter -->
                       <Border HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="8"
@@ -221,44 +240,6 @@
                         <TextBlock Text="{Binding StateLabel}" Foreground="White"
                                    FontFamily="{StaticResource FontMono}" FontSize="10" />
                       </Border>
-
-                      <!-- Bottom-right: stats (codec • res • fps) -->
-                      <Border HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="8"
-                              Background="#80000000" CornerRadius="3" Padding="6,2"
-                              IsVisible="{Binding HasStats}">
-                        <TextBlock Text="{Binding StatsLabel}"
-                                   FontFamily="{StaticResource FontMono}" FontSize="10" Foreground="White" />
-                      </Border>
-
-                      <!-- Bottom-left: HD snapshot. The tile streams SD, but the
-                           service grabs an HD source (Majestic HTTP / brief main). -->
-                      <Button HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="8"
-                              Command="{Binding SnapshotCommand}"
-                              IsVisible="{Binding !IsFailed}"
-                              Background="#80000000" CornerRadius="14"
-                              Width="28" Height="28" Padding="0"
-                              ToolTip.Tip="{Binding [Tile.Snapshot], Source={x:Static svc:Localizer.Instance}}">
-                        <Path Classes="lucide" Data="{StaticResource IconCamera}"
-                              Stroke="White" Width="16" Height="16" />
-                      </Button>
-
-                      <!-- Listen toggle (Phase 17): makes this tile the single
-                           audio source. Shown when a native sink exists. -->
-                      <Button HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="44,8,8,8"
-                              Command="{Binding ToggleListenCommand}"
-                              IsVisible="{Binding AudioAvailable}"
-                              Background="#80000000" CornerRadius="14"
-                              Width="28" Height="28" Padding="0"
-                              ToolTip.Tip="{Binding [CameraPage.Tooltip.Listen], Source={x:Static svc:Localizer.Instance}}">
-                        <Panel>
-                          <Path Classes="lucide" Data="{StaticResource IconVolume}"
-                                Stroke="{StaticResource AccentBrush}" Width="16" Height="16"
-                                IsVisible="{Binding IsListening}" />
-                          <Path Classes="lucide" Data="{StaticResource IconVolumeMuted}"
-                                Stroke="White" Width="16" Height="16"
-                                IsVisible="{Binding !IsListening}" />
-                        </Panel>
-                      </Button>
 
                       <!-- Brief "captured" flash. -->
                       <Border IsVisible="{Binding SnapshotFlash}" Background="#50FFFFFF"
@@ -364,7 +345,7 @@
                 Padding="8,6" CornerRadius="6"
                 Background="{StaticResource Bg2Brush}"
                 BorderBrush="{StaticResource BorderMediumBrush}" BorderThickness="1">
-          <Path Classes="lucide" Data="{StaticResource IconChevronRight}" Stroke="{StaticResource TextPrimaryBrush}" Width="14" Height="14" />
+          <Path Classes="lucide" Data="{StaticResource IconChevronLeft}" Stroke="{StaticResource TextPrimaryBrush}" Width="14" Height="14" />
         </Button>
       </StackPanel>
     </Border>
