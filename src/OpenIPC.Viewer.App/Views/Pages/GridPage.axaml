@@ -11,20 +11,57 @@
              RenderOptions.BitmapInterpolationMode="LowQuality"
              UseLayoutRounding="True">
 
-  <Grid RowDefinitions="Auto,Auto,*,Auto">
+  <Grid RowDefinitions="Auto,*,Auto">
 
-    <!-- Toolbar Unificada (Arriba a la derecha) -->
+    <!-- Header: Título Live + Botón/Pestañas de Layout a la Izquierda | Herramientas a la Derecha -->
     <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,12">
-      <TextBlock Grid.Column="0"
-                 Text="{Binding Title}"
-                 FontSize="{StaticResource FontSizeXl}"
-                 FontWeight="SemiBold"
-                 Foreground="{StaticResource TextPrimaryBrush}"
-                 VerticalAlignment="Center" />
+      
+      <!-- LADO IZQUIERDO: Texto Live + Pestañas de Layout (Default, etc.) -->
+      <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
+        <TextBlock Text="{Binding Title}"
+                   FontSize="{StaticResource FontSizeXl}"
+                   FontWeight="SemiBold"
+                   Foreground="{StaticResource TextPrimaryBrush}"
+                   VerticalAlignment="Center" />
 
-      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
+        <!-- Selector / Pestañas de Layouts alineado horizontalmente al lado del título -->
+        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+          <ItemsControl ItemsSource="{Binding Layouts}" x:CompileBindings="False">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <StackPanel Orientation="Horizontal" Spacing="6" />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Border Tapped="OnTabTapped"
+                        PointerPressed="OnTabPointerPressed"
+                        PointerMoved="OnTabPointerMoved"
+                        AttachedToVisualTree="OnTabAttached"
+                        input:DragDrop.AllowDrop="True"
+                        Cursor="Hand"
+                        Padding="12,6" CornerRadius="6"
+                        BorderBrush="{StaticResource BorderMediumBrush}" BorderThickness="1">
+                  <Border.Background>
+                    <MultiBinding Converter="{x:Static conv:LayoutTabBrushConverter.Instance}">
+                      <Binding />
+                      <Binding Path="DataContext.ActiveLayout" RelativeSource="{RelativeSource AncestorType=ItemsControl}" />
+                    </MultiBinding>
+                  </Border.Background>
+                  <TextBlock Text="{Binding Name}"
+                             Foreground="{StaticResource TextPrimaryBrush}"
+                             VerticalAlignment="Center" />
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+      </StackPanel>
+
+      <!-- LADO DERECHO: Botones de herramientas -->
+      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
         
-        <!-- Botón único selector de Grid con Menú Desplegable -->
+        <!-- Botón selector de Grid con Menú Desplegable -->
         <Button Padding="10,6" CornerRadius="6"
                 Background="{StaticResource Bg2Brush}"
                 BorderBrush="{StaticResource BorderMediumBrush}" BorderThickness="1"
@@ -55,7 +92,7 @@
           </Button.Flyout>
         </Button>
 
-        <!-- Fullscreen / Pantalla Completa -->
+        <!-- Fullscreen -->
         <Button Click="OnFullscreenClick"
                 Margin="4,0,4,0" Padding="10,6" CornerRadius="6"
                 Background="{StaticResource Bg2Brush}"
@@ -64,10 +101,10 @@
           <Path Classes="lucide" Data="{StaticResource IconMaximize}" Stroke="{StaticResource TextPrimaryBrush}" Width="14" Height="14" />
         </Button>
 
-        <!-- Separador visual leve -->
+        <!-- Separador visual -->
         <Border Width="1" Height="20" Background="{StaticResource BorderWeakBrush}" Margin="4,0" VerticalAlignment="Center" />
 
-        <!-- Botones de Gestión de Layouts ( +, Monitor, Lápiz ) -->
+        <!-- Gestión de Layouts ( +, Monitor, Lápiz ) -->
         <Button Command="{Binding AddLayoutCommand}"
                 Content="+" FontSize="16" FontWeight="SemiBold"
                 Padding="12,2" CornerRadius="6"
@@ -93,43 +130,8 @@
       </StackPanel>
     </Grid>
 
-    <!-- Pestañas de Layouts -->
-    <Grid Grid.Row="1" Margin="0,0,0,12">
-      <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
-        <ItemsControl ItemsSource="{Binding Layouts}" x:CompileBindings="False">
-          <ItemsControl.ItemsPanel>
-            <ItemsPanelTemplate>
-              <StackPanel Orientation="Horizontal" Spacing="4" />
-            </ItemsPanelTemplate>
-          </ItemsControl.ItemsPanel>
-          <ItemsControl.ItemTemplate>
-            <DataTemplate>
-              <Border Tapped="OnTabTapped"
-                      PointerPressed="OnTabPointerPressed"
-                      PointerMoved="OnTabPointerMoved"
-                      AttachedToVisualTree="OnTabAttached"
-                      input:DragDrop.AllowDrop="True"
-                      Cursor="Hand"
-                      Padding="12,6" CornerRadius="6"
-                      BorderBrush="{StaticResource BorderMediumBrush}" BorderThickness="1">
-                <Border.Background>
-                  <MultiBinding Converter="{x:Static conv:LayoutTabBrushConverter.Instance}">
-                    <Binding />
-                    <Binding Path="DataContext.ActiveLayout" RelativeSource="{RelativeSource AncestorType=ItemsControl}" />
-                  </MultiBinding>
-                </Border.Background>
-                <TextBlock Text="{Binding Name}"
-                           Foreground="{StaticResource TextPrimaryBrush}"
-                           VerticalAlignment="Center" />
-              </Border>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
-      </ScrollViewer>
-    </Grid>
-
-    <!-- Grid Optimizado (Aliased + Pixel Snapping) -->
-    <ItemsControl Grid.Row="2" 
+    <!-- Grid de Cámaras (Fila 1) -->
+    <ItemsControl Grid.Row="1" 
                   ItemsSource="{Binding Slots}" 
                   x:CompileBindings="False"
                   RenderOptions.EdgeMode="Aliased"
@@ -172,12 +174,12 @@
                       <controls:RtspVideoView Session="{Binding Session}"
                                               IsVisible="{Binding !StillsMode}" />
 
-                      <!-- Stills mode: periodic HTTP snapshot instead of live video. -->
+                      <!-- Stills mode -->
                       <Image Source="{Binding StillFrame}"
                              Stretch="Uniform"
                              IsVisible="{Binding StillsMode}" />
 
-                      <!-- AI detection boxes (Phase 15.5), above the video. -->
+                      <!-- AI detection boxes -->
                       <controls:DetectionOverlay Detections="{Binding Detections}"
                                                  ShowBoxes="{Binding AnalyticsEnabled}"
                                                  SourceAspect="{Binding SourceAspect}"
@@ -186,7 +188,6 @@
                       <!-- Bottom-left: Audio Toggle + Camera Name -->
                       <StackPanel HorizontalAlignment="Left" VerticalAlignment="Bottom" 
                                   Orientation="Horizontal" Spacing="6" Margin="8">
-                        <!-- Listen toggle button -->
                         <Button Command="{Binding ToggleListenCommand}"
                                 IsVisible="{Binding AudioAvailable}"
                                 Background="#80000000" CornerRadius="14"
@@ -202,7 +203,6 @@
                           </Panel>
                         </Button>
 
-                        <!-- Camera Name -->
                         <Border Background="#90000000" CornerRadius="3" Padding="6,2" VerticalAlignment="Center">
                           <TextBlock Text="{Binding Name}" Foreground="White" FontSize="13" FontWeight="Medium" />
                         </Border>
@@ -223,11 +223,9 @@
                                    FontFamily="{StaticResource FontMono}" FontSize="10" />
                       </Border>
 
-                      <!-- Brief "captured" flash. -->
                       <Border IsVisible="{Binding SnapshotFlash}" Background="#50FFFFFF"
                               IsHitTestVisible="False" />
 
-                      <!-- Connecting / reconnecting dim overlay with spinner. -->
                       <Border IsVisible="{Binding IsConnecting}" Background="#80000000">
                         <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="10">
                           <ProgressBar IsIndeterminate="True" Width="110" />
@@ -238,7 +236,6 @@
                         </StackPanel>
                       </Border>
 
-                      <!-- Interactive error cell — reason + Retry / Close. -->
                       <Border IsVisible="{Binding IsFailed}" Background="#A4000000">
                         <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center"
                                     Spacing="8" Margin="12" MaxWidth="320">
@@ -282,8 +279,8 @@
       </ItemsControl.ItemTemplate>
     </ItemsControl>
 
-    <!-- Pager: < 1 2 3 > — pages of the active layout -->
-    <Border Grid.Row="3"
+    <!-- Pager (Fila 2) -->
+    <Border Grid.Row="2"
             IsVisible="{Binding HasMultiplePages}"
             HorizontalAlignment="Center"
             Margin="0,12,0,0">
