@@ -1,5 +1,6 @@
 using System;
 using System.Reactive.Linq;
+using System.Runtime.InteropServices;
 using System.Threading;
 using Avalonia;
 using Avalonia.Controls;
@@ -25,7 +26,7 @@ public sealed partial class RtspVideoView : UserControl
     private WriteableBitmap? _bitmap;
     private IDisposable? _frameSub;
     
-    // Indicador atómico para evitar saturar el UI Thread (Drop de frames si el UI está ocupado)
+    // Indicador atómico para evitar saturar el UI Thread (descarta frames si la UI está ocupada)
     private int _isRendering = 0;
 
     public RtspVideoView()
@@ -33,9 +34,6 @@ public sealed partial class RtspVideoView : UserControl
         InitializeComponent();
         _image = this.FindControl<Image>("PART_Image")
                  ?? throw new InvalidOperationException("PART_Image missing");
-        
-        // Desactivar alpha blending a nivel de plataforma para ahorrar ciclos de Shader en GPU
-        RenderOptions.SetRequiresAlpha(_image, false);
     }
 
     static RtspVideoView()
@@ -51,14 +49,13 @@ public sealed partial class RtspVideoView : UserControl
 
     private void OnFrame(VideoFrame frame)
     {
-        // Si el UI Thread está ocupado procesando el fotograma anterior, descartamos este frame
-        // Esto evita que la cola del Dispatcher colapse la memoria RAM y el hilo principal
+        // Si el UI Thread sigue ocupado con el fotograma anterior, saltamos este
         if (Interlocked.CompareExchange(ref _isRendering, 1, 0) != 0)
         {
             return;
         }
 
-        // Post asíncrono para liberar inmediatamente el hilo del decodificador de video
+        // Post asíncrono no bloqueante
         Dispatcher.UIThread.Post(() =>
         {
             try
@@ -70,24 +67,14 @@ public sealed partial class RtspVideoView : UserControl
 
                 using (var locked = _bitmap.Lock())
                 {
-                    unsafe
-                    {
-                        fixed (byte* srcPtr = frame.Bgra)
-                        {
-                            byte* dstPtr = (byte*)locked.Address;
-                            int bytesToCopy = frame.Stride * frame.Height;
-                            
-                            // Copia por bloques de memoria directa a nivel de CPU/Punteros
-                            Buffer.MemoryCopy(srcPtr, dstPtr, bytesToCopy, bytesToCopy);
-                        }
-                    }
+                    Marshal.Copy(frame.Bgra, 0, locked.Address, frame.Stride * frame.Height);
                 }
 
                 _image.InvalidateVisual();
             }
             finally
             {
-                // Liberar el flag atómico para permitir el siguiente frame
+                // Liberar el flag atómico
                 Interlocked.Exchange(ref _isRendering, 0);
             }
         }, DispatcherPriority.Render);
@@ -98,13 +85,13 @@ public sealed partial class RtspVideoView : UserControl
         if (_bitmap is not null && _bitmap.PixelSize.Width == width && _bitmap.PixelSize.Height == height)
             return;
 
-        _bitmap?.Dispose(); // Liberar memoria nativa del bitmap previo si cambia la resolución
+        _bitmap?.Dispose();
 
         _bitmap = new WriteableBitmap(
             new PixelSize(width, height),
             new Vector(96, 96),
             PixelFormat.Bgra8888,
-            AlphaFormat.Opaque); // Cambiado a Opaque para evitar cálculos de transparencia inutiles
+            AlphaFormat.Opaque);
 
         _image.Source = _bitmap;
     }
