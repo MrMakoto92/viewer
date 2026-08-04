@@ -13,8 +13,8 @@
 
   <Grid RowDefinitions="Auto,*,Auto">
 
-    <!-- Header Principal (Solo 1 Fila Superior) -->
-    <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,12">
+    <!-- Header Principal (Solo 1 Fila Superior Compacta) -->
+    <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,8">
       
       <!-- LADO IZQUIERDO: Título "Live" + Pestaña "Default" en la misma línea -->
       <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
@@ -129,16 +129,18 @@
       </StackPanel>
     </Grid>
 
-    <!-- Grid de Cámaras (Ahora en Fila 1) -->
+    <!-- Grid de Cámaras (Estirado al máximo vertical) -->
     <ItemsControl Grid.Row="1" 
                   ItemsSource="{Binding Slots}" 
                   x:CompileBindings="False"
+                  VerticalAlignment="Stretch"
+                  HorizontalAlignment="Stretch"
                   RenderOptions.EdgeMode="Aliased"
                   RenderOptions.BitmapInterpolationMode="LowQuality"
                   UseLayoutRounding="True">
       <ItemsControl.ItemsPanel>
         <ItemsPanelTemplate>
-          <UniformGrid Columns="{Binding Columns}" Rows="{Binding Rows}" />
+          <UniformGrid Columns="{Binding Columns}" Rows="{Binding Rows}" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" />
         </ItemsPanelTemplate>
       </ItemsControl.ItemsPanel>
       <ItemsControl.ItemTemplate>
@@ -278,11 +280,11 @@
       </ItemsControl.ItemTemplate>
     </ItemsControl>
 
-    <!-- Pager (Fila 2) -->
+    <!-- Pager -->
     <Border Grid.Row="2"
             IsVisible="{Binding HasMultiplePages}"
             HorizontalAlignment="Center"
-            Margin="0,12,0,0">
+            Margin="0,8,0,0">
       <StackPanel Orientation="Horizontal" Spacing="4">
         <Button Command="{Binding PrevPageCommand}"
                 IsEnabled="{Binding CanPrevPage}"
