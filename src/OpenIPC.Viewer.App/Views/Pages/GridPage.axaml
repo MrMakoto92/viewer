@@ -13,55 +13,54 @@
 
   <Grid RowDefinitions="Auto,*,Auto">
 
-    <!-- Header: Título Live + Botón/Pestañas de Layout a la Izquierda | Herramientas a la Derecha -->
+    <!-- Header Principal (Solo 1 Fila Superior) -->
     <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,12">
       
-      <!-- LADO IZQUIERDO: Texto Live + Pestañas de Layout (Default, etc.) -->
-      <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
+      <!-- LADO IZQUIERDO: Título "Live" + Pestaña "Default" en la misma línea -->
+      <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
         <TextBlock Text="{Binding Title}"
                    FontSize="{StaticResource FontSizeXl}"
                    FontWeight="SemiBold"
                    Foreground="{StaticResource TextPrimaryBrush}"
                    VerticalAlignment="Center" />
 
-        <!-- Selector / Pestañas de Layouts alineado horizontalmente al lado del título -->
-        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
-          <ItemsControl ItemsSource="{Binding Layouts}" x:CompileBindings="False">
-            <ItemsControl.ItemsPanel>
-              <ItemsPanelTemplate>
-                <StackPanel Orientation="Horizontal" Spacing="6" />
-              </ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
-            <ItemsControl.ItemTemplate>
-              <DataTemplate>
-                <Border Tapped="OnTabTapped"
-                        PointerPressed="OnTabPointerPressed"
-                        PointerMoved="OnTabPointerMoved"
-                        AttachedToVisualTree="OnTabAttached"
-                        input:DragDrop.AllowDrop="True"
-                        Cursor="Hand"
-                        Padding="12,6" CornerRadius="6"
-                        BorderBrush="{StaticResource BorderMediumBrush}" BorderThickness="1">
-                  <Border.Background>
-                    <MultiBinding Converter="{x:Static conv:LayoutTabBrushConverter.Instance}">
-                      <Binding />
-                      <Binding Path="DataContext.ActiveLayout" RelativeSource="{RelativeSource AncestorType=ItemsControl}" />
-                    </MultiBinding>
-                  </Border.Background>
-                  <TextBlock Text="{Binding Name}"
-                             Foreground="{StaticResource TextPrimaryBrush}"
-                             VerticalAlignment="Center" />
-                </Border>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-        </ScrollViewer>
+        <!-- Botón / Pestañas de Layout alineadas al lado de "Live" -->
+        <ItemsControl ItemsSource="{Binding Layouts}" x:CompileBindings="False" VerticalAlignment="Center">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <StackPanel Orientation="Horizontal" Spacing="6" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <Border Tapped="OnTabTapped"
+                      PointerPressed="OnTabPointerPressed"
+                      PointerMoved="OnTabPointerMoved"
+                      AttachedToVisualTree="OnTabAttached"
+                      input:DragDrop.AllowDrop="True"
+                      Cursor="Hand"
+                      Padding="10,5" CornerRadius="6"
+                      BorderBrush="{StaticResource BorderMediumBrush}" BorderThickness="1">
+                <Border.Background>
+                  <MultiBinding Converter="{x:Static conv:LayoutTabBrushConverter.Instance}">
+                    <Binding />
+                    <Binding Path="DataContext.ActiveLayout" RelativeSource="{RelativeSource AncestorType=ItemsControl}" />
+                  </MultiBinding>
+                </Border.Background>
+                <TextBlock Text="{Binding Name}"
+                           Foreground="{StaticResource TextPrimaryBrush}"
+                           FontSize="13"
+                           VerticalAlignment="Center" />
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
       </StackPanel>
 
       <!-- LADO DERECHO: Botones de herramientas -->
       <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
         
-        <!-- Botón selector de Grid con Menú Desplegable -->
+        <!-- Botón selector de Grid -->
         <Button Padding="10,6" CornerRadius="6"
                 Background="{StaticResource Bg2Brush}"
                 BorderBrush="{StaticResource BorderMediumBrush}" BorderThickness="1"
@@ -130,7 +129,7 @@
       </StackPanel>
     </Grid>
 
-    <!-- Grid de Cámaras (Fila 1) -->
+    <!-- Grid de Cámaras (Ahora en Fila 1) -->
     <ItemsControl Grid.Row="1" 
                   ItemsSource="{Binding Slots}" 
                   x:CompileBindings="False"
