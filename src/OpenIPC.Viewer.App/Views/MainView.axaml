@@ -11,21 +11,6 @@
              FontSize="{StaticResource FontSizeBase}"
              Foreground="{StaticResource TextPrimaryBrush}">
 
-  <!--
-    Responsive layout. The split happens at 700px:
-      wide  → desktop sidebar on the left, content fills the rest
-      narrow → bottom-nav under the content (mobile / pinned-narrow window)
-    ShowSidebar / ShowBottomNav are updated by code-behind on every SizeChanged
-    and both collapse while the mobile landscape-fullscreen camera view is
-    active (MainWindowViewModel.IsFullscreen).
-
-    CurrentPage is hosted in a SINGLE ContentControl shared by both layouts.
-    Hosting it twice (one ContentControl per layout) made the same page VM bind
-    to two views at once — both fired Loaded and double-activated the live
-    session (double Acquire + "Already started"). Only the chrome toggles on the
-    breakpoint now: the sidebar collapses to zero width and the bottom nav hides.
-  -->
-
   <Grid ColumnDefinitions="Auto,*">
 
     <!-- Desktop sidebar — fixed 200px wide; collapses to nothing when narrow. -->
@@ -45,6 +30,7 @@
                    Margin="8,8,8,20" />
 
         <StackPanel Spacing="2" VerticalAlignment="Top">
+          <!-- Live -->
           <RadioButton Classes="sidebar" GroupName="DesktopNav"
                        IsChecked="{Binding IsLiveSelected, Mode=OneWay}"
                        Command="{Binding NavigateCommand}"
@@ -54,6 +40,8 @@
               <TextBlock Text="{Binding [Nav.Live], Source={x:Static svc:Localizer.Instance}}" VerticalAlignment="Center" />
             </StackPanel>
           </RadioButton>
+          
+          <!-- Library -->
           <RadioButton Classes="sidebar" GroupName="DesktopNav"
                        IsChecked="{Binding IsLibrarySelected, Mode=OneWay}"
                        Command="{Binding NavigateCommand}"
@@ -63,36 +51,8 @@
               <TextBlock Text="{Binding [Nav.Library], Source={x:Static svc:Localizer.Instance}}" VerticalAlignment="Center" />
             </StackPanel>
           </RadioButton>
-          <RadioButton Classes="sidebar" GroupName="DesktopNav"
-                       IsChecked="{Binding IsRecordingsSelected, Mode=OneWay}"
-                       Command="{Binding NavigateCommand}"
-                       CommandParameter="recordings">
-            <StackPanel Orientation="Horizontal" Spacing="12">
-              <PathIcon Data="{StaticResource IconRecordings}" Width="16" Height="16" />
-              <TextBlock Text="{Binding [Nav.Recordings], Source={x:Static svc:Localizer.Instance}}" VerticalAlignment="Center" />
-            </StackPanel>
-          </RadioButton>
-          <RadioButton Classes="sidebar" GroupName="DesktopNav"
-                       IsChecked="{Binding IsEventsSelected, Mode=OneWay}"
-                       Command="{Binding NavigateCommand}"
-                       CommandParameter="events">
-            <StackPanel Orientation="Horizontal" Spacing="12">
-              <PathIcon Data="{StaticResource IconEvents}" Width="16" Height="16" />
-              <TextBlock Text="{Binding [Nav.Events], Source={x:Static svc:Localizer.Instance}}" VerticalAlignment="Center" />
-            </StackPanel>
-          </RadioButton>
-          <RadioButton Classes="sidebar" GroupName="DesktopNav"
-                       IsChecked="{Binding IsAnalyticsSelected, Mode=OneWay}"
-                       Command="{Binding NavigateCommand}"
-                       CommandParameter="analytics">
-            <StackPanel Orientation="Horizontal" Spacing="12">
-              <!-- IconRadar is a stroke-designed Lucide path → render via Path.lucide,
-                   not PathIcon (which fills the open arcs into a blob). -->
-              <Path Classes="lucide" Data="{StaticResource IconRadar}"
-                    Stroke="{StaticResource TextPrimaryBrush}" Width="16" Height="16" />
-              <TextBlock Text="{Binding [Nav.Analytics], Source={x:Static svc:Localizer.Instance}}" VerticalAlignment="Center" />
-            </StackPanel>
-          </RadioButton>
+          
+          <!-- Settings -->
           <RadioButton Classes="sidebar" GroupName="DesktopNav"
                        IsChecked="{Binding IsSettingsSelected, Mode=OneWay}"
                        Command="{Binding NavigateCommand}"
