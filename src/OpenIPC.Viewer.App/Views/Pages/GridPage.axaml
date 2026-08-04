@@ -6,7 +6,10 @@
              xmlns:svc="using:OpenIPC.Viewer.App.Services"
              xmlns:input="using:Avalonia.Input"
              x:Class="OpenIPC.Viewer.App.Views.Pages.GridPage"
-             x:DataType="vm:GridPageViewModel">
+             x:DataType="vm:GridPageViewModel"
+             RenderOptions.EdgeMode="Aliased"
+             RenderOptions.BitmapInterpolationMode="LowQuality"
+             UseLayoutRounding="True">
 
   <Grid RowDefinitions="Auto,Auto,*,Auto">
 
@@ -157,8 +160,13 @@
       </StackPanel>
     </Grid>
 
-    <!-- Grid -->
-    <ItemsControl Grid.Row="2" ItemsSource="{Binding Slots}" x:CompileBindings="False">
+    <!-- Grid Optimizado (Aliased + Pixel Snapping) -->
+    <ItemsControl Grid.Row="2" 
+                  ItemsSource="{Binding Slots}" 
+                  x:CompileBindings="False"
+                  RenderOptions.EdgeMode="Aliased"
+                  RenderOptions.BitmapInterpolationMode="LowQuality"
+                  UseLayoutRounding="True">
       <ItemsControl.ItemsPanel>
         <ItemsPanelTemplate>
           <UniformGrid Columns="{Binding Columns}" Rows="{Binding Rows}" />
