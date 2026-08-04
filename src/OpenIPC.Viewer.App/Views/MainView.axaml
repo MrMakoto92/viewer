@@ -23,7 +23,7 @@
       <DockPanel LastChildFill="True" Margin="12">
 
         <TextBlock DockPanel.Dock="Top"
-                   Text="OpenIPC Viewer"
+                   Text="OrionViewer+"
                    FontSize="{StaticResource FontSizeMd}"
                    FontWeight="SemiBold"
                    Foreground="{StaticResource TextPrimaryBrush}"
