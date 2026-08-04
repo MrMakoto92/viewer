@@ -1,6 +1,6 @@
 using System;
 using System.Reactive.Linq;
-using System.Runtime.InteropServices;
+using System.Threading;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media.Imaging;
@@ -24,12 +24,18 @@ public sealed partial class RtspVideoView : UserControl
     private readonly Image _image;
     private WriteableBitmap? _bitmap;
     private IDisposable? _frameSub;
+    
+    // Indicador atómico para evitar saturar el UI Thread (Drop de frames si el UI está ocupado)
+    private int _isRendering = 0;
 
     public RtspVideoView()
     {
         InitializeComponent();
         _image = this.FindControl<Image>("PART_Image")
                  ?? throw new InvalidOperationException("PART_Image missing");
+        
+        // Desactivar alpha blending a nivel de plataforma para ahorrar ciclos de Shader en GPU
+        RenderOptions.SetRequiresAlpha(_image, false);
     }
 
     static RtspVideoView()
@@ -43,23 +49,48 @@ public sealed partial class RtspVideoView : UserControl
         _frameSub = Session?.Frames.Subscribe(OnFrame);
     }
 
-    // OnFrame fires on the decoder thread. We marshal to UI synchronously so the
-    // frame's pooled buffer stays valid until the copy completes (see
-    // FfmpegVideoSession comment in EmitFrame).
     private void OnFrame(VideoFrame frame)
     {
-        Dispatcher.UIThread.Invoke(() =>
+        // Si el UI Thread está ocupado procesando el fotograma anterior, descartamos este frame
+        // Esto evita que la cola del Dispatcher colapse la memoria RAM y el hilo principal
+        if (Interlocked.CompareExchange(ref _isRendering, 1, 0) != 0)
         {
-            EnsureBitmap(frame.Width, frame.Height);
-            if (_bitmap is null)
-                return;
+            return;
+        }
 
-            using (var locked = _bitmap.Lock())
+        // Post asíncrono para liberar inmediatamente el hilo del decodificador de video
+        Dispatcher.UIThread.Post(() =>
+        {
+            try
             {
-                Marshal.Copy(frame.Bgra, 0, locked.Address, frame.Stride * frame.Height);
+                if (Session == null) return;
+
+                EnsureBitmap(frame.Width, frame.Height);
+                if (_bitmap is null) return;
+
+                using (var locked = _bitmap.Lock())
+                {
+                    unsafe
+                    {
+                        fixed (byte* srcPtr = frame.Bgra)
+                        {
+                            byte* dstPtr = (byte*)locked.Address;
+                            int bytesToCopy = frame.Stride * frame.Height;
+                            
+                            // Copia por bloques de memoria directa a nivel de CPU/Punteros
+                            Buffer.MemoryCopy(srcPtr, dstPtr, bytesToCopy, bytesToCopy);
+                        }
+                    }
+                }
+
+                _image.InvalidateVisual();
             }
-            _image.InvalidateVisual();
-        });
+            finally
+            {
+                // Liberar el flag atómico para permitir el siguiente frame
+                Interlocked.Exchange(ref _isRendering, 0);
+            }
+        }, DispatcherPriority.Render);
     }
 
     private void EnsureBitmap(int width, int height)
@@ -67,11 +98,14 @@ public sealed partial class RtspVideoView : UserControl
         if (_bitmap is not null && _bitmap.PixelSize.Width == width && _bitmap.PixelSize.Height == height)
             return;
 
+        _bitmap?.Dispose(); // Liberar memoria nativa del bitmap previo si cambia la resolución
+
         _bitmap = new WriteableBitmap(
             new PixelSize(width, height),
             new Vector(96, 96),
             PixelFormat.Bgra8888,
-            AlphaFormat.Premul);
+            AlphaFormat.Opaque); // Cambiado a Opaque para evitar cálculos de transparencia inutiles
+
         _image.Source = _bitmap;
     }
 
@@ -79,6 +113,10 @@ public sealed partial class RtspVideoView : UserControl
     {
         _frameSub?.Dispose();
         _frameSub = null;
+        
+        _bitmap?.Dispose();
+        _bitmap = null;
+
         base.OnDetachedFromVisualTree(e);
     }
 }
