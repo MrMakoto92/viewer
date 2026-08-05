@@ -8,6 +8,6 @@ public sealed class AndroidHwDecoderFactory : IHwDecoderFactory
 
     public HwProbeResult Probe()
     {
-        return HwProbeResult.Success();
+        return new HwProbeResult(Available: true, Reason: null);
     }
 }
