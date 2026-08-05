@@ -3,7 +3,10 @@ using Android.App;
 using Android.Content.PM;
 using Android.OS;
 using Android.Views;
+using Avalonia;
 using Avalonia.Android;
+using Microsoft.Extensions.DependencyInjection;
+using OpenIPC.Viewer.Core.Video;
 
 namespace OpenIPC.Viewer.Android;
 
@@ -15,8 +18,21 @@ namespace OpenIPC.Viewer.Android;
     WindowSoftInputMode = SoftInput.AdjustResize | SoftInput.StateHidden,
     ConfigurationChanges = ConfigChanges.Orientation | ConfigChanges.ScreenSize
                           | ConfigChanges.UiMode | ConfigChanges.Density)]
-public sealed class MainActivity : AvaloniaMainActivity
+public sealed class MainActivity : AvaloniaMainActivity<App>
 {
+    protected override AppBuilder CustomizeAppBuilder(AppBuilder builder)
+    {
+        return base.CustomizeAppBuilder(builder)
+            .AfterSetup(_ =>
+            {
+                // Con esto le avisamos a la app que active la aceleración por hardware MediaCodec
+                if (App.Services is IServiceCollection services)
+                {
+                    services.AddSingleton<IHwDecoderFactory, AndroidHwDecoderFactory>();
+                }
+            });
+    }
+
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
