@@ -162,7 +162,7 @@
 
             <TextBlock Foreground="{StaticResource TextSecondaryBrush}">
               <Run Text="OrionViewer+ " />
-              <Run Text="{Binding Version}" />
+              <Run Text="Powered by NVR ORION" />
             </TextBlock>
 
             <StackPanel Orientation="Horizontal" Spacing="12">
