@@ -26,7 +26,6 @@ public sealed partial class RtspVideoView : UserControl
     private WriteableBitmap? _bitmap;
     private IDisposable? _frameSub;
     
-    // Indicador atómico para evitar saturar el UI Thread (descarta frames si la UI está ocupada)
     private int _isRendering = 0;
 
     public RtspVideoView()
@@ -49,13 +48,13 @@ public sealed partial class RtspVideoView : UserControl
 
     private void OnFrame(VideoFrame frame)
     {
-        // Si el UI Thread sigue ocupado procesando el frame previo, descartamos este para no acumular latencia
+        // Si el UI Thread sigue ocupado, descartamos este frame para evitar acumulaciones
         if (Interlocked.CompareExchange(ref _isRendering, 1, 0) != 0)
         {
             return;
         }
 
-        // Usamos Post con la máxima prioridad posible para sincronizar inmediatamente con el refresco de pantalla
+        // Post con Render priority (prioridad adecuada para evitar bloqueos en Android)
         Dispatcher.UIThread.Post(() =>
         {
             try
@@ -69,13 +68,15 @@ public sealed partial class RtspVideoView : UserControl
                 {
                     Marshal.Copy(frame.Bgra, 0, locked.Address, frame.Stride * frame.Height);
                 }
-                // Se removió InvalidateVisual() explícito para evitar repintados dobles en la GPU de Android
+
+                // Notificar explícitamente a Avalonia que el control necesita redibujarse
+                _image.InvalidateVisual();
             }
             finally
             {
                 Interlocked.Exchange(ref _isRendering, 0);
             }
-        }, DispatcherPriority.MaxValue);
+        }, DispatcherPriority.Render);
     }
 
     private void EnsureBitmap(int width, int height)
