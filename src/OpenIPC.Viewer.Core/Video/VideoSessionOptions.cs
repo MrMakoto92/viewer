@@ -10,11 +10,20 @@ public sealed record VideoSessionOptions(
     HwAccelHint HwAccel,
     TimeSpan NetworkCaching,
     bool AutoReconnect = true,
-    // Decode the RTSP audio track too (Phase 17.1). Off by default so a grid of
-    // tiles never burns CPU/traffic decoding audio for cameras nobody is
-    // listening to — the single-camera page opts in.
-    bool EnableAudio = false)
+    bool EnableAudio = false,
+    // Opciones para suavizar reproducción y evitar desincronización/tirones
+    bool LowDelay = true,
+    bool FrameDrop = true)
 {
     public static VideoSessionOptions Default(Uri uri, CameraCredentials? creds = null) =>
-        new(uri, creds, RtspTransport.Tcp, HwAccelHint.Auto, TimeSpan.FromMilliseconds(150));
+        new(
+            uri, 
+            creds, 
+            RtspTransport.Tcp, 
+            HwAccelHint.Auto, 
+            TimeSpan.FromMilliseconds(150),
+            AutoReconnect: true,
+            EnableAudio: false,
+            LowDelay: true,
+            FrameDrop: true);
 }
