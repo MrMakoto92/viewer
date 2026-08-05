@@ -23,9 +23,6 @@ internal sealed class FfmpegVideoSession : IVideoSession
     private readonly Subject<SessionState> _stateChanged = new();
     private readonly Subject<SessionTelemetry> _telemetry = new();
 
-    // Audio output is normalized to this format for every camera (Phase 17.1):
-    // signed-16 interleaved, stereo, 48 kHz. swresample does the heavy lifting;
-    // the native sink (WASAPI etc.) only converts to the device mix format.
     private const int AudioOutSampleRate = 48000;
     private const int AudioOutChannels = 2;
 
@@ -37,15 +34,9 @@ internal sealed class FfmpegVideoSession : IVideoSession
     private SessionState _state = SessionState.Idle;
     private string? _lastError;
 
-    // Smart Pause gate (Phase 12.1). Signaled = decoding; reset = the Run loop
-    // parks before av_read_frame so a hidden tile burns no CPU. The native
-    // context stays alive for an instant resume.
     private readonly ManualResetEventSlim _decodeGate = new(true);
     private volatile bool _paused;
 
-    // Audio decode toggle (Phase 17). Read by the decode loop, which lazily sets
-    // up / tears down the audio decoder when this flips. Initialized from options
-    // so the single-camera page (EnableAudio=true) starts with audio ready.
     private volatile bool _audioEnabled;
 
     private int _framesDecoded;
@@ -56,12 +47,9 @@ internal sealed class FfmpegVideoSession : IVideoSession
     private int _width;
     private int _height;
 
-    // Held for the lifetime of the codec context to keep the unmanaged
-    // function pointer alive — FFmpeg invokes it via the AVCodecContext.
     private AVCodecContext_get_format? _getFormatDelegate;
     private AVPixelFormat _selectedHwPixFmt = AVPixelFormat.AV_PIX_FMT_NONE;
 
-    // Snapshot of the most recently decoded frame, kept around for SnapshotAsync.
     private byte[]? _snapshotBgra;
     private int _snapshotWidth;
     private int _snapshotHeight;
@@ -117,9 +105,6 @@ internal sealed class FfmpegVideoSession : IVideoSession
         int w, h, stride;
         lock (_snapshotLock)
         {
-            // No frame decoded yet (still connecting). Return empty rather than
-            // throw — callers poll this while a fresh stream warms up, and an
-            // exception per poll floods the debugger and is pure control flow.
             if (_snapshotBgra is null)
                 return Task.FromResult(Array.Empty<byte>());
             bgra = (byte[])_snapshotBgra.Clone();
@@ -156,8 +141,6 @@ internal sealed class FfmpegVideoSession : IVideoSession
     public async ValueTask DisposeAsync()
     {
         _cts?.Cancel();
-        // Unblock the decode gate so a paused thread observes cancellation and
-        // exits instead of parking forever.
         _decodeGate.Set();
         if (_thread is { IsAlive: true })
         {
@@ -222,8 +205,6 @@ internal sealed class FfmpegVideoSession : IVideoSession
             ret = ffmpeg.avcodec_parameters_to_context(codecCtx, codecpar);
             FfmpegError.ThrowIfError(ret, "avcodec_parameters_to_context");
 
-            // HW accel decision: pure policy in Resolve, native wiring inline.
-            // Any failure here logs and continues with software decode.
             var resolved = HwAccelSelector.Resolve(_options.HwAccel, _hwFactory, _logger);
             if (resolved != HwAccelHint.None)
                 hwActive = TryEnableHw(codecCtx, resolved, &hwDeviceCtx);
@@ -231,7 +212,6 @@ internal sealed class FfmpegVideoSession : IVideoSession
             ret = ffmpeg.avcodec_open2(codecCtx, codec, null);
             if (ret < 0 && hwActive)
             {
-                // HW open failed: tear down HW state and retry as software.
                 _logger.LogWarning("HW-accelerated avcodec_open2 failed: {Err}; retrying software", FfmpegError.Describe(ret));
                 TearDownHw(codecCtx, &hwDeviceCtx);
                 hwActive = false;
@@ -256,18 +236,12 @@ internal sealed class FfmpegVideoSession : IVideoSession
             var ct = _cts!.Token;
             while (!ct.IsCancellationRequested)
             {
-                // Smart Pause: park here (no av_read_frame, no decode) while the
-                // tile is hidden. Cancellation during pause throws and unwinds to
-                // the clean Idle exit below.
                 if (_paused)
                 {
                     try { _decodeGate.Wait(ct); }
                     catch (OperationCanceledException) { break; }
                 }
 
-                // Lazily spin the audio decoder up/down to track SetAudioEnabled.
-                // Done on the decode thread only, so audioCtx/swr are never raced.
-                // A camera with no audio track is probed once and left alone.
                 if (_audioEnabled && audioStreamIndex < 0 && !audioProbedNoTrack)
                 {
                     audioStreamIndex = SetupAudio(fmtCtx, &audioCtx, &swr, &audioFrame);
@@ -283,7 +257,7 @@ internal sealed class FfmpegVideoSession : IVideoSession
                     if (audioFrame != null) { var p = audioFrame; ffmpeg.av_frame_free(&p); audioFrame = null; }
                     if (audioCtx != null) { var p = audioCtx; ffmpeg.avcodec_free_context(&p); audioCtx = null; }
                     audioStreamIndex = -1;
-                    audioProbedNoTrack = false; // a later re-enable should retry setup
+                    audioProbedNoTrack = false;
                 }
 
                 ret = ffmpeg.av_read_frame(fmtCtx, packet);
@@ -311,7 +285,6 @@ internal sealed class FfmpegVideoSession : IVideoSession
                     continue;
                 }
 
-                // Demux-level byte count → video bitrate in MaybePublishTelemetry.
                 Interlocked.Add(ref _bytesSinceFpsTick, packet->size);
 
                 ret = ffmpeg.avcodec_send_packet(codecCtx, packet);
@@ -346,9 +319,6 @@ internal sealed class FfmpegVideoSession : IVideoSession
                         presentable = swFrame;
                     }
 
-                    // Lazy sws init — the actual sw pixfmt is only known once
-                    // the first frame arrives (matters for HW path where the
-                    // codecCtx->pix_fmt is the HW pixfmt, not the sw one).
                     var framePixFmt = (AVPixelFormat)presentable->format;
                     if (sws == null || framePixFmt != swsSrcPixFmt)
                     {
@@ -406,8 +376,6 @@ internal sealed class FfmpegVideoSession : IVideoSession
         ctx->hw_device_ctx = ffmpeg.av_buffer_ref(device);
         *outDeviceCtx = device;
 
-        // Closure over hwPixFmt — keep the delegate rooted via instance field
-        // so the unmanaged function pointer remains valid for the codec's life.
         _selectedHwPixFmt = hwPixFmt;
         _getFormatDelegate = GetFormatCallback;
         ctx->get_format = new AVCodecContext_get_format_func
@@ -419,14 +387,9 @@ internal sealed class FfmpegVideoSession : IVideoSession
 
     private unsafe AVPixelFormat GetFormatCallback(AVCodecContext* ctx, AVPixelFormat* fmts)
     {
-        // First pass: pick the HW pixfmt if the decoder offers it.
         for (var p = fmts; *p != AVPixelFormat.AV_PIX_FMT_NONE; p++)
             if (*p == _selectedHwPixFmt) return *p;
 
-        // Fallback: decoder didn't offer the HW format (typical on Android
-        // emulators — no MediaCodec passthrough). Return the first offered
-        // (software) format. Returning AV_PIX_FMT_NONE makes the decoder
-        // reject every subsequent packet with AVERROR_INVALIDDATA.
         var fallback = *fmts;
         _logger.LogWarning("get_format: HW pixfmt {Fmt} not offered; falling back to software {Sw}",
             _selectedHwPixFmt, fallback);
@@ -466,10 +429,6 @@ internal sealed class FfmpegVideoSession : IVideoSession
 
             var vf = new VideoFrame(bgra, _width, _height, stride, frame->pts, DateTime.UtcNow);
 
-            // Synchronous delivery: subscribers must finish (incl. UI Marshal.Copy) before
-            // OnNext returns. After that we return the buffer to the pool. The natural
-            // backpressure is that a slow subscriber blocks the decoder thread —
-            // intentional per architecture §6.3 (drop, don't buffer).
             try
             {
                 _frames.OnNext(vf);
@@ -489,9 +448,6 @@ internal sealed class FfmpegVideoSession : IVideoSession
         }
     }
 
-    // Finds the first audio stream, opens its decoder and a swresample context
-    // that normalizes to S16/48 kHz/stereo. Returns the stream index, or -1 if
-    // there is no audio or setup fails (caller treats both as "no audio").
     private unsafe int SetupAudio(AVFormatContext* fmtCtx, AVCodecContext** outCtx, SwrContext** outSwr, AVFrame** outFrame)
     {
         var idx = -1;
@@ -530,7 +486,6 @@ internal sealed class FfmpegVideoSession : IVideoSession
             return -1;
         }
 
-        // Input layout: trust the decoder's if it knows it, else assume mono.
         AVChannelLayout defaultIn = default;
         AVChannelLayout* inLayout;
         if (ctx->ch_layout.nb_channels > 0)
@@ -611,13 +566,11 @@ internal sealed class FfmpegVideoSession : IVideoSession
     {
         if (inRate <= 0) return;
 
-        // Worst-case output sample count: queued resampler delay + this frame,
-        // rescaled to the output rate.
         var delay = ffmpeg.swr_get_delay(swr, inRate);
         var maxOut = (int)ffmpeg.av_rescale_rnd(delay + frame->nb_samples, AudioOutSampleRate, inRate, AVRounding.AV_ROUND_UP);
         if (maxOut <= 0) return;
 
-        var pcm = new byte[maxOut * AudioOutChannels * 2]; // S16 = 2 bytes/sample
+        var pcm = new byte[maxOut * AudioOutChannels * 2];
         int produced;
         fixed (byte* dst = pcm)
         {
@@ -674,7 +627,7 @@ internal sealed class FfmpegVideoSession : IVideoSession
 
         _telemetry.OnNext(new SessionTelemetry(
             FramesDecoded: _framesDecoded,
-            FramesDropped: 0, // synchronous delivery — no internal drops yet; Phase 3 grid adds backpressure counters
+            FramesDropped: 0,
             Fps: fps,
             AverageLatency: TimeSpan.Zero,
             Codec: _codecName,
@@ -703,11 +656,15 @@ internal sealed class FfmpegVideoSession : IVideoSession
             _ => "tcp",
         };
         ffmpeg.av_dict_set(opts, "rtsp_transport", transport, 0);
-        ffmpeg.av_dict_set(opts, "stimeout", "5000000", 0);          // 5s socket timeout (µs)
-        ffmpeg.av_dict_set(opts, "max_delay", "200000", 0);          // 200ms reorder window
-        ffmpeg.av_dict_set(opts, "buffer_size", "1048576", 0);
+        ffmpeg.av_dict_set(opts, "stimeout", "3000000", 0);           // Timeout a 3s (µs)
+        ffmpeg.av_dict_set(opts, "max_delay", "100000", 0);           // Reducido a 100ms de latencia máxima
+        ffmpeg.av_dict_set(opts, "buffer_size", "524288", 0);         // Reducido a 512KB para evitar acumulación
         ffmpeg.av_dict_set(opts, "reorder_queue_size", "0", 0);
-        ffmpeg.av_dict_set(opts, "fflags", "nobuffer", 0);
+        ffmpeg.av_dict_set(opts, "fflags", "nobuffer+discardcorrupt", 0); // Descarte de corrupciones sin buffering
+        ffmpeg.av_dict_set(opts, "flags", "low_delay", 0);            // Modo ultra baja latencia
+        ffmpeg.av_dict_set(opts, "framedrop", "1", 0);                // Habilita descarte automático de frames atrasados
+        ffmpeg.av_dict_set(opts, "probesize", "32768", 0);            // 32KB para análisis ultrarrápido del stream
+        ffmpeg.av_dict_set(opts, "analyzeduration", "100000", 0);     // 100ms de análisis de duración de stream
     }
 
     private static string BuildUrlWithCredentials(Uri uri, CameraCredentials? creds)
