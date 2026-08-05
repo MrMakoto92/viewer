@@ -152,14 +152,20 @@
                   input:DragDrop.AllowDrop="True"
                   AttachedToVisualTree="OnSlotAttached">
             <Grid>
-              <!-- Empty placeholder -->
+              <!-- Empty placeholder estilo NVR con Logo PNG -->
               <Border IsVisible="{Binding ., Converter={x:Static ObjectConverters.IsNull}}"
-                      Background="{StaticResource Bg1Brush}">
-                <TextBlock Text="{Binding [Grid.EmptySlot], Source={x:Static svc:Localizer.Instance}}"
-                           HorizontalAlignment="Center"
-                           VerticalAlignment="Center"
-                           Foreground="{StaticResource TextTertiaryBrush}"
-                           FontSize="{StaticResource FontSizeSm}" />
+                      Background="#111111">
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
+                  <Image Source="avares://OpenIPC.Viewer.App/Assets/logo_placeholder.png"
+                         MaxWidth="160"
+                         MaxHeight="160"
+                         Opacity="0.3"
+                         Stretch="Uniform" />
+                  <TextBlock Text="{Binding [Grid.EmptySlot], Source={x:Static svc:Localizer.Instance}}"
+                             HorizontalAlignment="Center"
+                             Foreground="#555555"
+                             FontSize="12" />
+                </StackPanel>
               </Border>
 
               <!-- Tile -->
