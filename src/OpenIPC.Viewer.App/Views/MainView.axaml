@@ -22,12 +22,13 @@
             BorderThickness="0,0,1,0">
       <DockPanel LastChildFill="True" Margin="12">
 
-        <TextBlock DockPanel.Dock="Top"
-                   Text="OrionViewer+"
-                   FontSize="{StaticResource FontSizeMd}"
-                   FontWeight="SemiBold"
-                   Foreground="{StaticResource TextPrimaryBrush}"
-                   Margin="8,8,8,20" />
+        <!-- Reemplazo del TextBlock "OrionViewer+" por el Logo en la barra lateral -->
+        <Image DockPanel.Dock="Top"
+               Source="avares://OpenIPC.Viewer.App/Assets/brand_logo.png"
+               MaxHeight="40"
+               HorizontalAlignment="Left"
+               Stretch="Uniform"
+               Margin="8,8,8,20" />
 
         <StackPanel Spacing="2" VerticalAlignment="Top">
           <!-- Live -->
