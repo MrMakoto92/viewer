@@ -49,13 +49,13 @@ public sealed partial class RtspVideoView : UserControl
 
     private void OnFrame(VideoFrame frame)
     {
-        // Si el UI Thread sigue ocupado con el fotograma anterior, saltamos este
+        // Si el UI Thread sigue ocupado procesando el frame previo, descartamos este para no acumular latencia
         if (Interlocked.CompareExchange(ref _isRendering, 1, 0) != 0)
         {
             return;
         }
 
-        // Post asíncrono no bloqueante
+        // Usamos Post con la máxima prioridad posible para sincronizar inmediatamente con el refresco de pantalla
         Dispatcher.UIThread.Post(() =>
         {
             try
@@ -69,15 +69,13 @@ public sealed partial class RtspVideoView : UserControl
                 {
                     Marshal.Copy(frame.Bgra, 0, locked.Address, frame.Stride * frame.Height);
                 }
-
-                _image.InvalidateVisual();
+                // Se removió InvalidateVisual() explícito para evitar repintados dobles en la GPU de Android
             }
             finally
             {
-                // Liberar el flag atómico
                 Interlocked.Exchange(ref _isRendering, 0);
             }
-        }, DispatcherPriority.Render);
+        }, DispatcherPriority.MaxValue);
     }
 
     private void EnsureBitmap(int width, int height)
