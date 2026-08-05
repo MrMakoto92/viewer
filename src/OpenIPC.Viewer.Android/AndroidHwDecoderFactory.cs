@@ -6,6 +6,6 @@ public sealed class AndroidHwDecoderFactory : IHwDecoderFactory
 {
     public HwAccelHint Kind => HwAccelHint.MediaCodec;
 
-    public HwDecoderProbe Probe() =>
-        new(Available: true, Reason: null);
+    public HwDecoderProbeResult Probe() =>
+        new HwDecoderProbeResult(Available: true, Reason: null);
 }
