@@ -50,15 +50,12 @@ public sealed partial class GridPageViewModel : ViewModelBase,
     public ObservableCollection<CameraTileViewModel> Tiles { get; } = new();
     public ObservableCollection<CameraTileViewModel?> Slots { get; } = new();
 
-    // Tabbed layouts (Phase 19.1). Tabs bind to Layouts; the grid shows
-    // ActiveLayout's tiles. Switching persists the choice to UserSettings.
     public ObservableCollection<GridLayout> Layouts { get; } = new();
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanDeleteLayout))]
     private GridLayout? _activeLayout;
 
-    // Keep at least one layout — deleting the last would leave no grid.
     public bool CanDeleteLayout => Layouts.Count > 1;
 
     [ObservableProperty]
@@ -69,22 +66,17 @@ public sealed partial class GridPageViewModel : ViewModelBase,
     public int Columns => LayoutSize;
     public int Rows => LayoutSize;
 
-    // Pagination within a layout. The visual grid (LayoutSize² cells) is one
-    // page; a layout can hold more cameras than fit, so the member list is
-    // windowed by page. Only the current page's cameras get live sessions, so
-    // a 16-camera layout at 2×2 keeps just 4 decoders alive at a time.
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CurrentPageDisplay))]
     [NotifyPropertyChangedFor(nameof(CanPrevPage))]
     [NotifyPropertyChangedFor(nameof(CanNextPage))]
-    private int _currentPage; // 0-based
+    private int _currentPage;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasMultiplePages))]
     [NotifyPropertyChangedFor(nameof(CanNextPage))]
     private int _pageCount = 1;
 
-    // 1-based page numbers shown as "1 2 3 …" in the pager.
     public ObservableCollection<int> Pages { get; } = new();
 
     public int CurrentPageDisplay => CurrentPage + 1;
@@ -130,20 +122,14 @@ public sealed partial class GridPageViewModel : ViewModelBase,
         WeakReferenceMessenger.Default.Register<CloseTileMessage>(this);
         WeakReferenceMessenger.Default.Register<ConfigImportedMessage>(this);
 
-        // Re-render when the user changes the max-sessions cap so currently-
-        // dropped cameras come back (or excess ones go away) without a relaunch.
         _userSettings.Changed += async (_, _) =>
         {
-            // Our own active-layout persistence raises Changed too — skip the
-            // refresh then (the switch already refreshed).
             if (_suppressSettingsRefresh) return;
             try { await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => RefreshTilesAsync(CancellationToken.None)); }
             catch (Exception ex) { _logger.LogWarning(ex, "Grid refresh after settings change failed"); }
         };
     }
 
-    // Health Center (Slice D): probe-based overview of every camera's status.
-    // Built inline — we already hold the directory, probe and logger factory.
     [RelayCommand]
     private async Task OpenHealthAsync()
     {
@@ -166,21 +152,18 @@ public sealed partial class GridPageViewModel : ViewModelBase,
         foreach (var l in all) Layouts.Add(l);
         OnPropertyChanged(nameof(CanDeleteLayout));
 
-        // Restore the persisted active layout, else fall back to the first.
         var activeId = _userSettings.Current.ActiveLayoutId;
         ActiveLayout = Layouts.FirstOrDefault(l => l.Id.Value == activeId) ?? Layouts.FirstOrDefault();
         if (ActiveLayout is { } a) LayoutSize = a.GridSize;
         CurrentPage = 0;
     }
 
-    // Parameter is string because XAML CommandParameter literals are strings; using
-    // int here would make AsyncRelayCommand<int>.Execute throw at first render.
     [RelayCommand]
     private async Task SetLayoutAsync(string size)
     {
         if (!int.TryParse(size, out var n) || n < 1 || n > 5) return;
         LayoutSize = n;
-        CurrentPage = 0; // page size changed → repaginate from the first page
+        CurrentPage = 0;
         if (ActiveLayout is { } a)
         {
             await _layouts.SetGridSizeAsync(a.Id, n, CancellationToken.None).ConfigureAwait(true);
@@ -190,10 +173,6 @@ public sealed partial class GridPageViewModel : ViewModelBase,
         await RefreshTilesAsync(CancellationToken.None).ConfigureAwait(true);
     }
 
-    // --- Pagination -------------------------------------------------------
-    // CommandParameter is the boxed 1-based page number from the Pages binding;
-    // an object? parameter sidesteps the AsyncRelayCommand<int> render crash
-    // that string/int literals trigger (see SetLayoutAsync).
     [RelayCommand]
     private async Task GoToPageAsync(object? page)
     {
@@ -223,14 +202,13 @@ public sealed partial class GridPageViewModel : ViewModelBase,
         await RefreshTilesAsync(CancellationToken.None).ConfigureAwait(true);
     }
 
-    // --- Tab operations (Phase 19.1) --------------------------------------
     [RelayCommand]
     private async Task SwitchLayoutAsync(GridLayout? layout)
     {
         if (layout is null || (ActiveLayout is { } cur && cur.Id == layout.Id)) return;
         ActiveLayout = layout;
         LayoutSize = layout.GridSize;
-        CurrentPage = 0; // new layout → start at its first page
+        CurrentPage = 0;
         await PersistActiveLayoutAsync(layout.Id.Value).ConfigureAwait(true);
         await RefreshTilesAsync(CancellationToken.None).ConfigureAwait(true);
     }
@@ -248,9 +226,6 @@ public sealed partial class GridPageViewModel : ViewModelBase,
         if (created is not null) await SwitchLayoutAsync(created).ConfigureAwait(true);
     }
 
-    // Friendly camera picker for the active layout (Phase 19.1 polish) — adds/
-    // removes tiles directly, no detour through the Library checkbox. Refresh on
-    // close so the grid reflects whatever the user toggled.
     [RelayCommand]
     private async Task ManageCamerasAsync()
     {
@@ -284,13 +259,11 @@ public sealed partial class GridPageViewModel : ViewModelBase,
             Localizer.Instance["Common.Delete"], Localizer.Instance["Common.Cancel"]).ConfigureAwait(true);
         if (!ok) return;
         await _layouts.RemoveAsync(a.Id, CancellationToken.None).ConfigureAwait(true);
-        await LoadLayoutsAsync(CancellationToken.None).ConfigureAwait(true); // active id gone → falls back to first
+        await LoadLayoutsAsync(CancellationToken.None).ConfigureAwait(true);
         if (ActiveLayout is { } now) await PersistActiveLayoutAsync(now.Id.Value).ConfigureAwait(true);
         await RefreshTilesAsync(CancellationToken.None).ConfigureAwait(true);
     }
 
-    // Drag-reorder of the tabs themselves (Phase 19.1 polish). Both indices are
-    // in the Layouts collection; persists SortOrder = new index.
     public async Task MoveLayoutAsync(int fromIndex, int toIndex, CancellationToken ct)
     {
         if (fromIndex < 0 || fromIndex >= Layouts.Count) return;
@@ -322,8 +295,6 @@ public sealed partial class GridPageViewModel : ViewModelBase,
             if (Layouts[i].Id == updated.Id) { Layouts[i] = updated; break; }
     }
 
-    // --- Stills mode (grid-wide) --------------------------------------------
-    // Every tile shows a periodic HTTP snapshot instead of a live RTSP session.
     [ObservableProperty] private bool _stillsMode;
     [ObservableProperty] private int _stillsIntervalSeconds;
 
@@ -354,8 +325,6 @@ public sealed partial class GridPageViewModel : ViewModelBase,
         finally { _suppressSettingsRefresh = false; }
     }
 
-    // Full teardown + rebuild so tiles pick up the new stills mode/interval —
-    // RefreshTilesAsync reuses live tiles and wouldn't re-read the flag.
     private async Task RebuildTilesAsync()
     {
         for (var i = Tiles.Count - 1; i >= 0; i--)
@@ -370,17 +339,9 @@ public sealed partial class GridPageViewModel : ViewModelBase,
 
     private async Task RefreshTilesAsync(CancellationToken ct)
     {
-        // One page = the visual grid (LayoutSize² cells). Within a page two caps
-        // stack: the page size and the Settings → Video → MaxConcurrentGridSessions
-        // ceiling. The lower wins, so a "max 4" user with a 3×3 grid sees 4 live
-        // tiles and 5 empty placeholders (which still render via the Slots
-        // padding below).
         var pageSize = LayoutSize * LayoutSize;
         var capacity = Math.Min(pageSize, Math.Max(1, _userSettings.MaxConcurrentGridSessions));
 
-        // Full ordered membership of the active layout (Phase 19.1), mapped onto
-        // the loaded camera records. Falls back to the legacy IncludedInGrid flag
-        // if there's no layout (shouldn't happen post-migration).
         List<Camera> members;
         if (ActiveLayout is { } layout)
         {
@@ -393,30 +354,14 @@ public sealed partial class GridPageViewModel : ViewModelBase,
             members = _allCameras.Where(c => c.IncludedInGrid).ToList();
         }
 
-        // Repaginate: ceil(members / pageSize), at least one page. Clamp the
-        // current page in case membership shrank since the last render.
         var pageCount = Math.Max(1, (members.Count + pageSize - 1) / pageSize);
         if (CurrentPage >= pageCount) CurrentPage = pageCount - 1;
         if (CurrentPage < 0) CurrentPage = 0;
         UpdatePager(pageCount);
 
-        // Window into the current page, then cap live tiles. capacity ≤ pageSize,
-        // so any remainder of the page beyond the session cap shows as empty slots.
         var visible = members.Skip(CurrentPage * pageSize).Take(capacity).ToList();
         var visibleIds = visible.Select(c => c.Id).ToHashSet();
 
-        // Drop tiles that aren't in the new visible set. Flipping pages swaps the
-        // whole set, and each outgoing session's DisposeAsync joins its decode
-        // thread (up to ~2s if a stalled RTSP read is unwinding). Awaiting that
-        // inline left the grid blank until every old tile finished — the "hang"
-        // on page switch. Instead, remove them from the collection now and tear
-        // down in the background, in parallel.
-        //
-        // This is also cap-safe: LiveStreamCoordinator.ReleaseAsync frees the
-        // session-registry slot synchronously (under its lock) before the slow
-        // thread-join, and kicking off DisposeAsync below runs that synchronous
-        // prefix before this method returns to acquire the new page's sessions.
-        // So the new tiles never race the MaxConcurrentSessions ceiling.
         var stale = new List<CameraTileViewModel>();
         for (var i = Tiles.Count - 1; i >= 0; i--)
         {
@@ -429,27 +374,19 @@ public sealed partial class GridPageViewModel : ViewModelBase,
         if (stale.Count > 0)
             _ = DisposeTilesInBackgroundAsync(stale);
 
-        // Reconcile against the freshly-loaded records: keep unchanged tiles,
-        // rebuild ones whose stream URL was edited, add new ones. Without the
-        // rebuild branch an edited RTSP URL never reached the grid — the tile
-        // was matched by Id and kept, so it kept streaming the old URL until an
-        // app restart. RefreshTilesAsync re-runs on every Live-tab entry (the
-        // only time an edit can have landed), so the swap happens on next view.
+        int index = 0;
+
         foreach (var camera in visible)
         {
             var quality = DesiredQuality(camera);
             var existing = Tiles.FirstOrDefault(t => t.Camera.Id == camera.Id);
             if (existing is not null)
             {
-                // Rebuild on a stream-URL change OR an analytics-settings change:
-                // the tile holds an immutable Camera snapshot, so toggling
-                // analytics in the editor only takes effect by rebuilding it.
                 if (!StreamUriChanged(existing.Camera, camera) && !AnalyticsChanged(existing.Camera, camera))
                 {
-                    // Kept tile — re-evaluate SD/HD against the (possibly new)
-                    // layout. No-op when quality is unchanged.
                     try { await existing.SetQualityAsync(quality, ct).ConfigureAwait(true); }
                     catch (Exception ex) { _logger.LogWarning(ex, "Failed to switch quality for {Camera}", camera.Name); }
+                    index++;
                     continue;
                 }
 
@@ -461,37 +398,39 @@ public sealed partial class GridPageViewModel : ViewModelBase,
                 var rebuilt = new CameraTileViewModel(camera, _coordinator, _directory, _userSettings, _snapshots, _analytics, _analyticsBootstrap, _audio, _reachability, _statusRegistry, _frameSource, StillsMode, StillsIntervalSeconds, _loggerFactory.CreateLogger<CameraTileViewModel>());
                 rebuilt.SetInitialQuality(quality);
                 Tiles.Insert(idx, rebuilt);
+
+                if (index > 0)
+                    await Task.Delay(200, ct).ConfigureAwait(true);
+
                 try { await rebuilt.ActivateAsync(ct).ConfigureAwait(true); }
                 catch (Exception ex) { _logger.LogWarning(ex, "Failed to activate rebuilt tile for {Camera}", camera.Name); }
+                
+                index++;
                 continue;
             }
 
             var tile = new CameraTileViewModel(camera, _coordinator, _directory, _userSettings, _snapshots, _analytics, _analyticsBootstrap, _audio, _reachability, _statusRegistry, _frameSource, StillsMode, StillsIntervalSeconds, _loggerFactory.CreateLogger<CameraTileViewModel>());
             tile.SetInitialQuality(quality);
             Tiles.Add(tile);
+
+            if (index > 0)
+                await Task.Delay(200, ct).ConfigureAwait(true);
+
             try { await tile.ActivateAsync(ct).ConfigureAwait(true); }
             catch (Exception ex) { _logger.LogWarning(ex, "Failed to activate tile for {Camera}", camera.Name); }
+
+            index++;
         }
 
-        // Slots fills the *visual* grid (always LayoutSize²), padding with
-        // nulls when MaxConcurrentGridSessions is below the layout capacity.
         var visualCapacity = LayoutSize * LayoutSize;
         Slots.Clear();
         for (var i = 0; i < visualCapacity; i++)
             Slots.Add(i < Tiles.Count ? Tiles[i] : null);
     }
 
-    // A tile is rebuilt only when the URL it actually streams changes — the
-    // grid uses the substream, falling back to main (mirrors
-    // CameraTileViewModel.ActivateAsync). Comparing this (rather than the whole
-    // record) avoids churning sessions on cosmetic edits like a rename.
     private static bool StreamUriChanged(Camera a, Camera b) =>
         (a.RtspSubUri ?? a.RtspMainUri) != (b.RtspSubUri ?? b.RtspMainUri);
 
-    // True when a camera's analytics config changed (Phase 15) — the tile's
-    // frame tap reads its immutable Camera snapshot, so any change needs a
-    // rebuild. Compared field-by-field because AnalyticsSettings.ClassIds is a
-    // collection (record equality would compare it by reference).
     private static bool AnalyticsChanged(Camera a, Camera b)
     {
         var x = a.AnalyticsOrDefault;
@@ -505,17 +444,9 @@ public sealed partial class GridPageViewModel : ViewModelBase,
         return !xc.SequenceEqual(yc);
     }
 
-    // Auto SD/HD policy (Phase 12.2): mainstream only when a single tile fills
-    // the view (1×1 layout) and the user hasn't disabled the feature; otherwise
-    // the substream keeps the multi-camera grid light.
     private StreamQuality DesiredQuality(Camera camera) =>
         StreamQualityPolicy.Resolve(camera.StreamQualityOverride, _userSettings.Current.AutoSdHd, LayoutSize);
 
-    // Drag-reorder hook called from GridPage code-behind. Both indices are in
-    // the *Tiles* collection (live cameras only — empty Slots placeholders are
-    // not draggable and can't be drop targets). Persists SortOrder = newIndex
-    // for the affected tiles; cameras outside the grid keep their existing
-    // SortOrder (so library ordering only shifts grid-included rows).
     public async Task MoveTileAsync(int fromIndex, int toIndex, CancellationToken ct)
     {
         if (fromIndex < 0 || fromIndex >= Tiles.Count) return;
@@ -524,7 +455,6 @@ public sealed partial class GridPageViewModel : ViewModelBase,
 
         Tiles.Move(fromIndex, toIndex);
 
-        // Re-pad Slots so visual order matches the new Tiles order.
         var visualCapacity = LayoutSize * LayoutSize;
         Slots.Clear();
         for (var i = 0; i < visualCapacity; i++)
@@ -534,9 +464,6 @@ public sealed partial class GridPageViewModel : ViewModelBase,
 
         try
         {
-            // Tiles holds only the current page's visible prefix; reorder within
-            // the full member list (offset by the page) so cameras on other pages
-            // and beyond the session cap keep their place.
             var offset = CurrentPage * LayoutSize * LayoutSize;
             var from = offset + fromIndex;
             var to = offset + toIndex;
@@ -555,9 +482,6 @@ public sealed partial class GridPageViewModel : ViewModelBase,
         }
     }
 
-    // Close button on a tile's error cell — drop it from the grid for this
-    // session and leave an empty slot in its place. The camera stays
-    // IncludedInGrid, so re-entering Live re-adds it via RefreshTilesAsync.
     public async void Receive(CloseTileMessage message)
     {
         var tile = Tiles.FirstOrDefault(t => t.Camera.Id == message.CameraId);
@@ -568,9 +492,6 @@ public sealed partial class GridPageViewModel : ViewModelBase,
         catch (Exception ex) { _logger.LogWarning(ex, "Error releasing closed tile"); }
     }
 
-    // Tear down outgoing tiles off the UI path, in parallel. Each DisposeAsync
-    // releases its coordinator slot synchronously, then joins the decode thread
-    // (the slow part) in the background — so a page flip stays responsive.
     private async Task DisposeTilesInBackgroundAsync(IReadOnlyList<CameraTileViewModel> tiles)
     {
         await Task.WhenAll(tiles.Select(async tile =>
@@ -580,7 +501,6 @@ public sealed partial class GridPageViewModel : ViewModelBase,
         })).ConfigureAwait(false);
     }
 
-    // Sync the pager (page count + 1-based page-number list) after a refresh.
     private void UpdatePager(int pageCount)
     {
         PageCount = pageCount;
@@ -591,8 +511,6 @@ public sealed partial class GridPageViewModel : ViewModelBase,
         }
     }
 
-    // Re-pad Slots to the visual grid size (LayoutSize²), filling trailing
-    // gaps with null placeholders.
     private void RebuildSlots()
     {
         var visualCapacity = LayoutSize * LayoutSize;
@@ -601,10 +519,6 @@ public sealed partial class GridPageViewModel : ViewModelBase,
             Slots.Add(i < Tiles.Count ? Tiles[i] : null);
     }
 
-    // Smart Pause (Phase 12.1): on minimize, pause decode immediately (CPU
-    // drops, last frame stays frozen for an instant resume) and start a grace
-    // timer. Only if the window is still hidden after the grace period do we
-    // fully release the sessions to free RTSP connections.
     private static readonly TimeSpan PauseGrace = TimeSpan.FromSeconds(10);
 
     public void Receive(WindowMinimizedMessage message)
@@ -627,8 +541,6 @@ public sealed partial class GridPageViewModel : ViewModelBase,
         });
     }
 
-    // Config import (Phase 19.2): reload cameras + layouts so the grid reflects
-    // the imported set without a restart.
     public async void Receive(ConfigImportedMessage message)
     {
         try { await LoadAsync(CancellationToken.None).ConfigureAwait(true); }
@@ -641,13 +553,11 @@ public sealed partial class GridPageViewModel : ViewModelBase,
         _graceCts?.Cancel();
         if (Tiles.Count > 0)
         {
-            // Still paused (within grace) — resume in place, frozen frame intact.
             foreach (var tile in Tiles)
                 tile.Resume();
         }
         else
         {
-            // Grace elapsed and sessions were released — rebuild the grid.
             await LoadAsync(CancellationToken.None).ConfigureAwait(true);
         }
     }
