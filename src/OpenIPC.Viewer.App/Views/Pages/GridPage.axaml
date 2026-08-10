@@ -2,10 +2,9 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-             xmlns:vm="clr-namespace:OpenIPC.Viewer.ViewModels;assembly=OpenIPC.Viewer.App"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
              x:Class="OpenIPC.Viewer.App.Views.Pages.GridPage"
-             x:DataType="vm:GridViewModel">
+             x:CompileBindings="False">
 
     <!-- Fondo sólido oscuro para la TV Box -->
     <Grid Background="#101010">
