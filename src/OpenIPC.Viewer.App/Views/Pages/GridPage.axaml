@@ -2,13 +2,14 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:views="clr-namespace:OpenIPC.Viewer.App.Views"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
              x:Class="OpenIPC.Viewer.App.Views.Pages.GridPage"
              x:CompileBindings="False">
 
-    <!-- Fondo sólido oscuro para la TV Box -->
+    <!-- Fondo sólido oscuro de bajo consumo para la TV Box -->
     <Grid Background="#101010">
-        <!-- Grilla de distribución dinámica de las celdas de las cámaras -->
+        <!-- Grilla de distribución de cámaras con plantilla explícita -->
         <ItemsControl ItemsSource="{Binding VisibleCameras}">
             <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate>
@@ -16,6 +17,13 @@
                                  Rows="{Binding GridRows, FallbackValue=2}" />
                 </ItemsPanelTemplate>
             </ItemsControl.ItemsPanel>
+
+            <!-- Plantilla de cada celda: usa la vista optimizada de cámaras -->
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <views:CameraTileView />
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
         </ItemsControl>
     </Grid>
 </UserControl>
